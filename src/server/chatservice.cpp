@@ -1,6 +1,5 @@
 #include "chatservice.hpp"
 #include "public.hpp"
-// #include <muduo/base/Logging.h>
 #include <logger.hpp>
 #include "base64/base64.hpp"
 
@@ -62,7 +61,6 @@ void Chatservice::login(const TcpConnectionPtr &conn, json &js, TimeStamp time)
      * 登录协议为：msgid, name, pwd
      * 消息回复协议为：msgid，errno，...(成功返回相关信息，失败[errno!=0]返回错误消息)
      */
-    // int id = js["id"].get<int>();
     string name = js["name"];
     string pwd = js["pwd"];
 
@@ -104,9 +102,7 @@ void Chatservice::login(const TcpConnectionPtr &conn, json &js, TimeStamp time)
                 auto it = _userConnMap.find(f);
                 if (it != _userConnMap.end())
                 {
-                    // LOG_INFO << notice.dump() << " " << f;
                     LOG_INFO("%s\n", notice.dump().c_str());
-                    // it->second->send(notice.dump() + "\n");
                     sendMsg(it->second, notice.dump(), time);
                 }
             }
@@ -165,7 +161,6 @@ void Chatservice::login(const TcpConnectionPtr &conn, json &js, TimeStamp time)
                 res["sessions"] = "";
             }
 
-            // conn->send(res.dump() + "\n");
             sendMsg(conn, res.dump(), time);
         }
     }
@@ -175,7 +170,6 @@ void Chatservice::login(const TcpConnectionPtr &conn, json &js, TimeStamp time)
         res["msgid"] = LOGIN_MSG_ACK;
         res["errno"] = 2;
         res["errmsg"] = "id or password is invalid!";
-        // conn->send(res.dump() + "\n");
         sendMsg(conn, res.dump(), time);
     }
 }
@@ -219,7 +213,6 @@ void Chatservice::reg(const TcpConnectionPtr &conn, json &js, TimeStamp time)
         res["msgid"] = REG_MSG_ACK;
         res["errno"] = 0;
         res["id"] = user.getId();
-        // conn->send(res.dump() + "\n");
         sendMsg(conn, res.dump(), time);
     }
     else
@@ -228,7 +221,6 @@ void Chatservice::reg(const TcpConnectionPtr &conn, json &js, TimeStamp time)
         res["msgid"] = REG_MSG_ACK;
         res["errno"] = 1;
         res["errmsg"] = "register fail!";
-        // conn->send(res.dump() + "\n");
         sendMsg(conn, res.dump(), time);
     }
 }
@@ -248,28 +240,20 @@ void Chatservice::oneChat(const TcpConnectionPtr &conn, json &js, TimeStamp time
     // 插入历史消息
     _messageModel.insert(toid, fromid, -1, frommsg, 1, createat);
 
-    // LOG_INFO << toid << " " << fromid << " " << user.getState();
     LOG_INFO("toid:%d fromid:%d userState:%s\n", toid, fromid, user.getState().c_str());
     // if (user.getState() == "online")
     {
-        // LOG_INFO << "toid is online";
         LOG_INFO("toid is online\n");
         lock_guard<mutex> lock(_connMutex);
         auto it = _userConnMap.find(toid);
         if (it != _userConnMap.end())
         {
-            // LOG_INFO << "transport msg";
             LOG_INFO("transport msg\n");
             // 创建转发json，并进行转发
-            // it->second->send(js.dump() + "\n");
             sendMsg(it->second, js.dump(), time);
             return;
         }
     }
-    /**
-     * 接收用户不在线,储存离线消息
-     */
-    // _offlineMsgModel.insert(toid, js.dump());
 }
 
 void Chatservice::groupChat(const TcpConnectionPtr &conn, json &js, TimeStamp time)
@@ -278,7 +262,6 @@ void Chatservice::groupChat(const TcpConnectionPtr &conn, json &js, TimeStamp ti
      * msgid, fromid, frommsg, toid, createat, sessiontype
      * 转发内容除多了fromname外一致
      */
-    // int userid = js["userid"].get<int>();
     int groupid = js["toid"].get<int>();
     int fromid = js["fromid"].get<int>();
     int64_t createat = js["createat"].get<int64_t>();
@@ -304,14 +287,8 @@ void Chatservice::groupChat(const TcpConnectionPtr &conn, json &js, TimeStamp ti
          */
         if (it != _userConnMap.end())
         {
-
-            // it->second->send(js.dump());
             sendMsg(it->second, js.dump(), time);
         }
-        // else
-        // {
-        //     _offlineMsgModel.insert(id, js.dump());
-        // }
     }
 }
 
@@ -357,25 +334,6 @@ void Chatservice::reset()
     _userModel.resetState();
 }
 
-// void Chatservice::createGroup(const TcpConnectionPtr &conn, json &js, TimeStamp time)
-// {
-//     /**
-//      * msgid, userid, groupname,groupdesc
-//      */
-//     int userid = js["userid"].get<int>();
-//     string name = js["groupname"];
-//     string desc = js["groupdesc"];
-
-//     Group group(-1, name, desc);
-//     if (_groupModel.createGroup(group))
-//     {
-//         /**
-//          * 存储创始人信息
-//          */
-//         _groupModel.addGroup(userid, group.getId(), "creator");
-//     }
-// }
-
 void Chatservice::addGroup(const TcpConnectionPtr &conn, json &js, TimeStamp time)
 {
     /**
@@ -390,12 +348,10 @@ void Chatservice::addGroup(const TcpConnectionPtr &conn, json &js, TimeStamp tim
 void Chatservice::heartCheck(const TcpConnectionPtr &conn, json &js, TimeStamp time)
 {
     string heartmsg = js["heartMsg"];
-    // LOG_INFO << heartmsg;
     LOG_INFO("%s\n", heartmsg.c_str());
     json res;
     res["msgid"] = HEART_MSG;
     res["heartMsg"] = "heart_ok";
-    // conn->send(res.dump() + "\n");
     sendMsg(conn, res.dump(), time);
 }
 
@@ -450,7 +406,6 @@ void Chatservice::getSessionHistory(const TcpConnectionPtr &conn, json &js, Time
         res["errmsg"] = "can not get messages!";
         res["messages"] = "";
     }
-    // conn->send(res.dump() + "\n");
     sendMsg(conn, res.dump(), time);
 }
 
@@ -463,7 +418,6 @@ void Chatservice::getFriends(const TcpConnectionPtr &conn, json &js, TimeStamp t
     int userid = js["userid"].get<int>();
     string prename = js["prename"];
 
-    // LOG_INFO << "queryfriends: " << userid << " " << prename << " " << prename.size();
     LOG_INFO("queryfriends:%d prename:%s prenamesize:%d\n", userid, prename.c_str(), prename.size());
 
     json res;
@@ -487,7 +441,6 @@ void Chatservice::getFriends(const TcpConnectionPtr &conn, json &js, TimeStamp t
         res["friends"] = "";
     }
 
-    // conn->send(res.dump() + "\n");
     sendMsg(conn, res.dump(), time);
 }
 
@@ -524,7 +477,6 @@ void Chatservice::getUsers(const TcpConnectionPtr &conn, json &js, TimeStamp tim
         res["users"] = "";
     }
 
-    // conn->send(res.dump() + "\n");
     sendMsg(conn, res.dump(), time);
 }
 
@@ -571,7 +523,6 @@ void Chatservice::friendRequestReturn(const TcpConnectionPtr &conn, json &js, Ti
         res["reqs"] = "";
     }
 
-    // conn->send(res.dump() + "\n");
     sendMsg(conn, res.dump(), time);
 }
 
@@ -598,7 +549,6 @@ void Chatservice::acceptFriendRequest(const TcpConnectionPtr &conn, json &js, Ti
     res["fid"] = usr.getId();
     res["fname"] = usr.getName();
     res["fstate"] = usr.getState();
-    // conn->send(res.dump() + "\n");      // 通知当前用户
     sendMsg(conn, res.dump(), time); // 通知当前用户
 
     auto it = _userConnMap.find(usr.getId()); // 通知对方用户
@@ -609,7 +559,6 @@ void Chatservice::acceptFriendRequest(const TcpConnectionPtr &conn, json &js, Ti
         js["fid"] = _usr.getId();
         js["fname"] = _usr.getName();
         js["fstate"] = _usr.getState();
-        // it->second->send(js.dump() + "\n");
         sendMsg(it->second, js.dump(), time);
     }
     _requestModel.removeAccept(userid, fromid);
@@ -637,11 +586,9 @@ void Chatservice::createGroupChat(const TcpConnectionPtr &conn, json &js, TimeSt
     string memberids = js["memberids"];
     json members_js = json::parse(memberids);
     vector<int> members = members_js.get<vector<int>>();
-    // LOG_INFO << "this memberids: ";
     LOG_INFO("this memberids: ");
     for (auto member : members)
     {
-        // LOG_INFO << member << " ";
         LOG_INFO("%d ", member);
     }
     LOG_INFO("\n");
@@ -659,17 +606,14 @@ void Chatservice::createGroupChat(const TcpConnectionPtr &conn, json &js, TimeSt
     res["groupid"] = group.getId();
     res["groupname"] = groupname;
     _groupModel.addGroup(userid, group.getId(), "creator");
-    // conn->send(res.dump() + "\n");
     sendMsg(conn, res.dump(), time);
     for (const auto &id : members)
     {
-        // LOG_INFO << "thid id: " << id;
         LOG_INFO("thid id: %d\n", id);
         _groupModel.addGroup(id, group.getId(), "normal");
         auto it = _userConnMap.find(id);
         if (it != _userConnMap.end())
         {
-            // it->second->send(res.dump() + "\n");
             sendMsg(it->second, res.dump(), time);
         }
     }
@@ -690,7 +634,6 @@ void Chatservice::sendMsg(const TcpConnectionPtr &conn, const string &msgStr, Ti
     if (chunk_len >= len)
     {
         json js;
-        // js["message_size"] = len;
         js["chunk_id"] = 1;
         js["chunk_count"] = 1;
         js["message"] = _msgStr;

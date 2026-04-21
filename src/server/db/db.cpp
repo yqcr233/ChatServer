@@ -1,5 +1,4 @@
 #include "db.h"
-// #include <muduo/base/Logging.h>
 #include "logger.hpp"
 
 // 数据库配置信息
@@ -30,16 +29,10 @@ bool MySQL::connect()
     mysql_query(_conn, "SET NAMES utf8mb4");
     if (p != nullptr)
     {
-        /**
-         * C和C++默认编码字符为ASCII，如果这里不设置，从mysql上拉下来的中文会显示？
-         */
-        // mysql_query(_conn, "set names gbk");
-        // LOG_INFO << "connect mysql success!";
         LOG_INFO("connect mysql success!\n");
     }
     else
     {
-        // LOG_INFO << "connect mysql fail!";
         LOG_INFO("connect mysql fail!\n");
     }
     return p;
@@ -49,8 +42,6 @@ bool MySQL::update(string sql)
 {
     if (mysql_query(_conn, sql.c_str()))
     {
-        // LOG_INFO << __FILE__ << ":" << __LINE__ << ":"
-        //          << sql << "更新失败!";
         LOG_INFO("%s:%d:%s更新失败！\n", __FILE__, __LINE__, sql.c_str());
         return false;
     }
@@ -61,8 +52,6 @@ MYSQL_RES *MySQL::query(string sql)
 {
     if (mysql_query(_conn, sql.c_str()))
     {
-        // LOG_INFO << __FILE__ << ":" << __LINE__ << ":"
-        //          << sql << "查询失败!";
         LOG_INFO("%s:%d:%s查询失败！\n", __FILE__, __LINE__, sql.c_str());
         return nullptr;
     }

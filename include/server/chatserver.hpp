@@ -1,8 +1,7 @@
 #ifndef CHATSERVER_HPP
 #define CHATSERVER_HPP
 
-// #include <muduo/net/TcpServer.h>
-// #include <muduo/net/EventLoop.h>
+
 #include "tcp_server.hpp"
 #include "event_loop.hpp"
 #include "callbacks.hpp"
@@ -10,8 +9,6 @@
 #include <string>
 
 using namespace std;
-// using namespace muduo;
-// using namespace muduo::net;
 
 class ChatServer
 {
@@ -32,7 +29,6 @@ private:
                    TimeStamp time);
 
 private:
-    // muduo::net::TcpServer _server;
     TcpServer _server;
     EventLoop *_loop;
     string privateRsa;

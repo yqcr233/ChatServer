@@ -4,7 +4,6 @@
 #include "chatservice.hpp"
 #include "base64/base64.hpp"
 #include "aesgcm/aesgcm.hpp"
-// #include <muduo/base/Logging.h>
 #include <logger.hpp>
 
 using namespace std;
@@ -61,7 +60,6 @@ void ChatServer::onMessage(const TcpConnectionPtr &con,
      * 完全解耦网络模块代码和业务模块的代码
      * 在网络层server中没有调用任何业务层方法，而是通过映射表获取Handler
      */
-    // auto msgHandler = Chatservice::getInstance()->getMsgHandler(js["msgid"].get<int>());
     auto msgHandler = service->getMsgHandler(js["msgid"].get<int>());
     /**
      * 处理器执行相应业务处理

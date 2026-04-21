@@ -1,13 +1,11 @@
 #ifndef CHATSERVICE_HPP
 #define CHATSERVICE_HPP
-// #include <muduo/net/TcpConnection.h>
 #include <tcp_connection.hpp>
 #include "callbacks.hpp"
 #include <unordered_map>
 #include <functional>
 #include "usermodel.hpp"
 #include "friendmodel.hpp"
-#include "offlinemessagemodel.hpp"
 #include "groupmodel.hpp"
 #include "messagemodel.hpp"
 #include "requestmodel.hpp"
@@ -17,8 +15,6 @@
 #include <atomic>
 
 using namespace std;
-// using namespace muduo::net;
-// using namespace muduo;
 
 #include <json.hpp>
 using json = nlohmann::json;
@@ -90,7 +86,6 @@ private:
 
     UserModel _userModel;
     FriendModel _friendModel;
-    OfflineMessageModel _offlineMsgModel;
     GroupModel _groupModel;
     MessageModel _messageModel;
     RequestModel _requestModel;
