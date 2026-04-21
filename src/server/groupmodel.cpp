@@ -1,5 +1,5 @@
 #include "groupmodel.hpp"
-#include "db.h"
+#include "db.hpp"
 #include <string.h>
 
 /**
@@ -11,13 +11,11 @@ bool GroupModel::createGroup(Group &group)
     sprintf(sql, "insert into allgroup(groupname, groupdesc) values('%s', '%s')", group.getName().c_str(), group.getDesc().c_str());
 
     MySQL mysql;
-    if (mysql.connect())
+
+    if (mysql.update(sql))
     {
-        if (mysql.update(sql))
-        {
-            group.setId(mysql_insert_id(mysql.getConnection()));
-            return true;
-        }
+        group.setId(mysql_insert_id(mysql.getConnection()));
+        return true;
     }
     return false;
 }
@@ -30,10 +28,8 @@ void GroupModel::addGroup(int userid, int groupid, string grouprole)
     sprintf(sql, "insert into groupuser(groupid, userid, grouprole) values(%d, %d, '%s')", groupid, userid, grouprole.c_str());
 
     MySQL mysql;
-    if (mysql.connect())
-    {
-        mysql.update(sql);
-    }
+    
+    mysql.update(sql);
 }
 /**
  * 查询用户所在所有群组
@@ -48,22 +44,19 @@ vector<Group> GroupModel::queryGroups(int userid)
      */
     vector<Group> vec;
     MySQL mysql;
-    if (mysql.connect())
+    MYSQL_RES *res = mysql.query(sql);
+    if (res != nullptr)
     {
-        MYSQL_RES *res = mysql.query(sql);
-        if (res != nullptr)
+        MYSQL_ROW row;
+        while ((row = mysql_fetch_row(res)) != nullptr)
         {
-            MYSQL_ROW row;
-            while ((row = mysql_fetch_row(res)) != nullptr)
-            {
-                Group group;
-                group.setId(atoi(row[0]));
-                group.setName(row[1]);
-                group.setDesc(row[2]);
-                vec.push_back(group);
-            }
-            mysql_free_result(res);
+            Group group;
+            group.setId(atoi(row[0]));
+            group.setName(row[1]);
+            group.setDesc(row[2]);
+            vec.push_back(group);
         }
+        mysql_free_result(res);
     }
 
     /**
@@ -102,21 +95,20 @@ vector<GroupUser> GroupModel::queryGroupUsers(int userid, int groupid)
 
     vector<GroupUser> vec;
     MySQL mysql;
-    if(mysql.connect()) {
-        MYSQL_RES* res = mysql.query(sql);
-        if(res != nullptr) {
-            MYSQL_ROW row;
-            while ((row = mysql_fetch_row(res)) != nullptr) 
-            {
-                GroupUser user;
-                user.setId(atoi(row[0]));
-                user.setName(row[1]);
-                user.setState(row[2]);
-                user.setRole(row[3]);
-                vec.push_back(user);
-            }
-            mysql_free_result(res);
+    
+    MYSQL_RES* res = mysql.query(sql);
+    if(res != nullptr) {
+        MYSQL_ROW row;
+        while ((row = mysql_fetch_row(res)) != nullptr) 
+        {
+            GroupUser user;
+            user.setId(atoi(row[0]));
+            user.setName(row[1]);
+            user.setState(row[2]);
+            user.setRole(row[3]);
+            vec.push_back(user);
         }
+        mysql_free_result(res);
     }
     return vec;
 }

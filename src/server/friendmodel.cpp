@@ -1,5 +1,5 @@
 #include "friendmodel.hpp"
-#include "db.h"
+#include "db.hpp"
 
 /**
  * 添加好友关系
@@ -10,10 +10,7 @@ void FriendModel::insert(int userid, int friendid)
     sprintf(sql, "insert into friends(userid, friendid) values(%d, %d)", userid, friendid);
 
     MySQL mysql;
-    if (mysql.connect())
-    {
-        mysql.update(sql);
-    }
+    mysql.update(sql);
 }
 /**
  * 查询所有好友
@@ -25,23 +22,21 @@ vector<User> FriendModel::query(int userid)
 
     vector<User> vec;
     MySQL mysql;
-    if (mysql.connect())
+
+    MYSQL_RES *res = mysql.query(sql);
+    if (res != nullptr)
     {
-        MYSQL_RES *res = mysql.query(sql);
-        if (res != nullptr)
+        MYSQL_ROW row;
+        while ((row = mysql_fetch_row(res)) != nullptr)
         {
-            MYSQL_ROW row;
-            while ((row = mysql_fetch_row(res)) != nullptr)
-            {
-                User user;
-                user.setId(atoi(row[0]));
-                user.setName(row[1]);
-                user.setState(row[2]);
-                vec.push_back(user);
-            }
-            mysql_free_result(res);
-            return vec;
+            User user;
+            user.setId(atoi(row[0]));
+            user.setName(row[1]);
+            user.setState(row[2]);
+            vec.push_back(user);
         }
+        mysql_free_result(res);
+        return vec;
     }
 
     return vec;
@@ -53,23 +48,20 @@ vector<User> FriendModel::query(int userid, string prename)
 
     vector<User> users;
     MySQL mysql;
-    if (mysql.connect())
+    MYSQL_RES *res = mysql.query(sql);
+    if (res != nullptr)
     {
-        MYSQL_RES *res = mysql.query(sql);
-        if (res != nullptr)
+        MYSQL_ROW row;
+        while ((row = mysql_fetch_row(res)) != nullptr)
         {
-            MYSQL_ROW row;
-            while ((row = mysql_fetch_row(res)) != nullptr)
-            {
-                User user;
-                user.setId(atoi(row[0]));
-                user.setName(row[1]);
-                user.setState(row[2]);
-                users.push_back(user);
-            }
-            mysql_free_result(res);
-            return users;
+            User user;
+            user.setId(atoi(row[0]));
+            user.setName(row[1]);
+            user.setState(row[2]);
+            users.push_back(user);
         }
+        mysql_free_result(res);
+        return users;
     }
     return users;
 }
@@ -83,19 +75,16 @@ vector<int> FriendModel::queryOnlineFriends(int userid)
 
     vector<int> friends;
     MySQL mysql;
-    if (mysql.connect())
+    MYSQL_RES *res = mysql.query(sql);
+    if (res != nullptr)
     {
-        MYSQL_RES *res = mysql.query(sql);
-        if (res != nullptr)
+        MYSQL_ROW row;
+        while ((row = mysql_fetch_row(res)) != nullptr)
         {
-            MYSQL_ROW row;
-            while ((row = mysql_fetch_row(res)) != nullptr)
-            {
-                friends.push_back(atoi(row[0]));
-            }
-            mysql_free_result(res);
-            return friends;
+            friends.push_back(atoi(row[0]));
         }
+        mysql_free_result(res);
+        return friends;
     }
     return friends;
 }
@@ -109,8 +98,6 @@ void FriendModel::delete_(int userid, int friendid)
     sprintf(sql, "delete from friends where (userid=%d and friendid=%d) or (userid=%d and friendid=%d)", userid, friendid, friendid, userid);
 
     MySQL mysql;
-    if (mysql.connect())
-    {
-        mysql.update(sql);
-    }
+    
+    mysql.update(sql);
 }

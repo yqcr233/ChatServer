@@ -3,7 +3,7 @@
 #include "sessioninfo.hpp"
 #include "messagemodel.hpp"
 #include "timeutil.hpp"
-#include "db.h"
+#include "db.hpp"
 
 void MessageModel::insert(int toid, int fromid, int groupid, string msg, int state, int64_t createAt)
 {
@@ -14,10 +14,8 @@ void MessageModel::insert(int toid, int fromid, int groupid, string msg, int sta
             toid, fromid, groupid, msg.c_str(), state, _createAt.c_str());
 
     MySQL mysql;
-    if (mysql.connect())
-    {
-        mysql.update(sql);
-    }
+
+    mysql.update(sql);
 }
 
 vector<SessionInfo> MessageModel::querySessions(int userid)
@@ -72,23 +70,21 @@ vector<SessionInfo> MessageModel::querySessions(int userid)
     vector<SessionInfo> vec;
     MySQL mysql;
     
-    if(mysql.connect()) {
-        MYSQL_RES* res = mysql.query(sql);
-        if(res != nullptr) {
-            MYSQL_ROW row;
-            while((row = mysql_fetch_row(res)) != nullptr) {
-                SessionInfo info;
-                info.setChatType(row[0]);
-                info.setSessionId(atoi(row[1]));
-                info.setSessionName(row[2]);
-                info.setIsOnline(row[3]);
-                info.setLatestTime(TimeUtil::mysqlTimestampToMs(row[4]));
-                info.setLastMessage(row[5]);
-                info.setUnreadCount(atoi(row[6]));
-                vec.push_back(info);
-            }
-            mysql_free_result(res);
+    MYSQL_RES* res = mysql.query(sql);
+    if(res != nullptr) {
+        MYSQL_ROW row;
+        while((row = mysql_fetch_row(res)) != nullptr) {
+            SessionInfo info;
+            info.setChatType(row[0]);
+            info.setSessionId(atoi(row[1]));
+            info.setSessionName(row[2]);
+            info.setIsOnline(row[3]);
+            info.setLatestTime(TimeUtil::mysqlTimestampToMs(row[4]));
+            info.setLastMessage(row[5]);
+            info.setUnreadCount(atoi(row[6]));
+            vec.push_back(info);
         }
+        mysql_free_result(res);
     }
     return vec;
 }
@@ -104,25 +100,24 @@ vector<Message> MessageModel::queryOne(int userid, int sessionid)
      
     vector<Message> vec;
     MySQL mysql;
-    if(mysql.connect()) {
-        MYSQL_RES* res = mysql.query(sql);
-        if(res != nullptr) {
-            MYSQL_ROW row;
-            while((row = mysql_fetch_row(res)) != nullptr) {
-                Message msg;
-                msg.setToId(atoi(row[1]));
-                msg.setFromId(atoi(row[2]));
-                msg.setGroupId(atoi(row[3]));
-                msg.setMsg(row[4]);
-                msg.setState(atoi(row[5]));
-                msg.setCreateAt(TimeUtil::mysqlTimestampToMs(row[6]));
-                msg.setFromName(row[7]);
-                vec.push_back(msg);
 
-                fprintf(stdout, "%ld\n", TimeUtil::mysqlTimestampToMs(row[6]));
-            }
-            mysql_free_result(res);
+    MYSQL_RES* res = mysql.query(sql);
+    if(res != nullptr) {
+        MYSQL_ROW row;
+        while((row = mysql_fetch_row(res)) != nullptr) {
+            Message msg;
+            msg.setToId(atoi(row[1]));
+            msg.setFromId(atoi(row[2]));
+            msg.setGroupId(atoi(row[3]));
+            msg.setMsg(row[4]);
+            msg.setState(atoi(row[5]));
+            msg.setCreateAt(TimeUtil::mysqlTimestampToMs(row[6]));
+            msg.setFromName(row[7]);
+            vec.push_back(msg);
+
+            fprintf(stdout, "%ld\n", TimeUtil::mysqlTimestampToMs(row[6]));
         }
+        mysql_free_result(res);
     }
     return vec;
 }
@@ -135,23 +130,22 @@ vector<Message> MessageModel::queryGroup(int sessionid)
 
     vector<Message> vec;
     MySQL mysql;
-    if(mysql.connect()) {
-        MYSQL_RES* res = mysql.query(sql);
-        if(res !=nullptr) {
-            MYSQL_ROW row;
-            while((row=mysql_fetch_row(res)) != nullptr) {
-                Message msg;
-                msg.setToId(atoi(row[1]));
-                msg.setFromId(atoi(row[2]));
-                msg.setGroupId(atoi(row[3]));
-                msg.setMsg(row[4]);
-                msg.setState(atoi(row[5]));
-                msg.setCreateAt(TimeUtil::mysqlTimestampToMs(row[6]));
-                msg.setFromName(row[7]);
-                vec.push_back(msg);
-            }
-            mysql_free_result(res);
+    
+    MYSQL_RES* res = mysql.query(sql);
+    if(res !=nullptr) {
+        MYSQL_ROW row;
+        while((row=mysql_fetch_row(res)) != nullptr) {
+            Message msg;
+            msg.setToId(atoi(row[1]));
+            msg.setFromId(atoi(row[2]));
+            msg.setGroupId(atoi(row[3]));
+            msg.setMsg(row[4]);
+            msg.setState(atoi(row[5]));
+            msg.setCreateAt(TimeUtil::mysqlTimestampToMs(row[6]));
+            msg.setFromName(row[7]);
+            vec.push_back(msg);
         }
+        mysql_free_result(res);
     }
     return vec;
 }

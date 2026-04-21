@@ -1,5 +1,5 @@
 #include "usermodel.hpp"
-#include "db.h"
+#include "db.hpp"
 #include <iostream>
 #include <vector>
 
@@ -11,16 +11,13 @@ bool UserModel::insert(User &user)
             user.getName().c_str(), user.getPwd().c_str(), user.getState().c_str());
 
     MySQL mysql;
-    if (mysql.connect())
+    if (mysql.update(sql))
     {
-        if (mysql.update(sql))
-        {
-            /**
-             * 数据插入成功后，获取新用户数据逐渐id
-             */
-            user.setId(mysql_insert_id(mysql.getConnection()));
-            return true;
-        }
+        /**
+         * 数据插入成功后，获取新用户数据逐渐id
+         */
+        user.setId(mysql_insert_id(mysql.getConnection()));
+        return true;
     }
     return false;
 }
@@ -32,25 +29,23 @@ User UserModel::query(string name)
     sprintf(sql, "select * from user where name='%s' ", name.c_str());
 
     MySQL mysql;
-    if (mysql.connect())
+    
+    MYSQL_RES *res = mysql.query(sql);
+    if (res != nullptr)
     {
-        MYSQL_RES *res = mysql.query(sql);
-        if (res != nullptr)
+        MYSQL_ROW row = mysql_fetch_row(res);
+        if (row != nullptr)
         {
-            MYSQL_ROW row = mysql_fetch_row(res);
-            if (row != nullptr)
-            {
-                User user;
-                /**
-                 * 返回值是一个string数组，表示每个属性值
-                 */
-                user.setId(atoi(row[0]));
-                user.setName(row[1]);
-                user.setPwd(row[2]);
-                user.setState(row[3]);
-                mysql_free_result(res);
-                return user;
-            }
+            User user;
+            /**
+             * 返回值是一个string数组，表示每个属性值
+             */
+            user.setId(atoi(row[0]));
+            user.setName(row[1]);
+            user.setPwd(row[2]);
+            user.setState(row[3]);
+            mysql_free_result(res);
+            return user;
         }
     }
     /**
@@ -64,25 +59,22 @@ User UserModel::query(int userid){
     sprintf(sql, "select * from user where id=%d ", userid);
 
     MySQL mysql;
-    if (mysql.connect())
+    MYSQL_RES *res = mysql.query(sql);
+    if (res != nullptr)
     {
-        MYSQL_RES *res = mysql.query(sql);
-        if (res != nullptr)
+        MYSQL_ROW row = mysql_fetch_row(res);
+        if (row != nullptr)
         {
-            MYSQL_ROW row = mysql_fetch_row(res);
-            if (row != nullptr)
-            {
-                User user;
-                /**
-                 * 返回值是一个string数组，表示每个属性值
-                 */
-                user.setId(atoi(row[0]));
-                user.setName(row[1]);
-                user.setPwd(row[2]);
-                user.setState(row[3]);
-                mysql_free_result(res);
-                return user;
-            }
+            User user;
+            /**
+             * 返回值是一个string数组，表示每个属性值
+             */
+            user.setId(atoi(row[0]));
+            user.setName(row[1]);
+            user.setPwd(row[2]);
+            user.setState(row[3]);
+            mysql_free_result(res);
+            return user;
         }
     }
     /**
@@ -98,13 +90,10 @@ bool UserModel::updateState(User user)
     sprintf(sql, "update user set state = '%s' where id = %d", user.getState().c_str(), user.getId());
 
     MySQL mysql;
-    if (mysql.connect())
+    if (mysql.update(sql))
     {
-        if (mysql.update(sql))
-        {
-            // 通知其他的在线好友用户状态改变
-            return true;
-        }
+        // 通知其他的在线好友用户状态改变
+        return true;
     }
     return false;
 }
@@ -115,10 +104,7 @@ void UserModel::resetState()
     char sql[1024] = "update user set state = 'offline' where state = 'online'";
 
     MySQL mysql;
-    if (mysql.connect())
-    {
-        mysql.update(sql);
-    }
+    mysql.update(sql);
 }
 
 // 根据用户名前缀查询所有用户信息
@@ -137,21 +123,20 @@ vector<FriendUser> UserModel::queryUsersByPreName(int userid, string prename){
     
     vector<FriendUser> users;
     MySQL mysql;
-    if(mysql.connect()) {
-        MYSQL_RES* res = mysql.query(sql);
-        if(res != nullptr) {
-            MYSQL_ROW row;
-            while((row = mysql_fetch_row(res)) != nullptr) {
-                FriendUser user;
-                user.setId(atoi(row[0]));
-                user.setName(row[1]);
-                user.setState(row[2]);
-                user.setIsFriend(atoi(row[3]));
-                users.push_back(user);
-            }
-            mysql_free_result(res);
-            return users;
+
+    MYSQL_RES* res = mysql.query(sql);
+    if(res != nullptr) {
+        MYSQL_ROW row;
+        while((row = mysql_fetch_row(res)) != nullptr) {
+            FriendUser user;
+            user.setId(atoi(row[0]));
+            user.setName(row[1]);
+            user.setState(row[2]);
+            user.setIsFriend(atoi(row[3]));
+            users.push_back(user);
         }
+        mysql_free_result(res);
+        return users;
     }
     return users;
 }

@@ -1,5 +1,6 @@
 #include "chatserver.hpp"
 #include "chatservice.hpp"
+#include "mysqlpool.hpp"
 #include <iostream>
 #include <signal.h>
 #include "rsa.hpp"
@@ -17,7 +18,13 @@ int main(int argc, char const *argv[])
      */
     signal(SIGINT, resetHandler);
 
-    EventLoop loop;
+    if (!MysqlPool::instance().init("127.0.0.1", "root", "12345", "chat", 3306, 5))
+    {
+        std::cerr << "数据库连接池初始化失败！" << std::endl;
+        return 1;
+    }
+    
+    EventLoop loop; 
     // InetAddress addr("192.168.152.100", 9999);
     InetAddress addr(9999, "192.168.152.100");
     ChatServer server(&loop, addr, "EchoServer");

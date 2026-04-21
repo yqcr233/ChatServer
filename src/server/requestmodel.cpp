@@ -1,5 +1,5 @@
 #include "requestmodel.hpp"
-#include <db.h>
+#include "db.hpp"
 
 /**
  * 插入一条好友请求
@@ -10,10 +10,8 @@ void RequestModel::insert(FriendRequest req)
     sprintf(sql, "insert into friendrequests(fromid, toid, message) values(%d, %d, '%s')", req.getFromid(), req.getToid(), req.getMessage().c_str());
 
     MySQL mysql;
-    if (mysql.connect())
-    {
-        mysql.update(sql);
-    }
+    
+    mysql.update(sql);
 }
 
 /**
@@ -26,24 +24,22 @@ vector<FriendRequest> RequestModel::query(int userid)
 
     MySQL mysql;
     vector<FriendRequest> vec;
-    if (mysql.connect())
+
+    MYSQL_RES *res = mysql.query(sql);
+    if (res != nullptr)
     {
-        MYSQL_RES *res = mysql.query(sql);
-        if (res != nullptr)
+        MYSQL_ROW row;
+        while ((row = mysql_fetch_row(res)) != nullptr)
         {
-            MYSQL_ROW row;
-            while ((row = mysql_fetch_row(res)) != nullptr)
-            {
-                FriendRequest req;
-                req.setReqid(atoi(row[0]));
-                req.setFromid(atoi(row[1]));
-                req.setFromname(row[2]);
-                req.setMessage(row[3]);
-                vec.push_back(req);
-            }
-            mysql_free_result(res);
-            return vec;
+            FriendRequest req;
+            req.setReqid(atoi(row[0]));
+            req.setFromid(atoi(row[1]));
+            req.setFromname(row[2]);
+            req.setMessage(row[3]);
+            vec.push_back(req);
         }
+        mysql_free_result(res);
+        return vec;
     }
     return vec;
 }
@@ -57,10 +53,8 @@ void RequestModel::removeAccept(int userid, int fromid)
     sprintf(sql, "delete from friendrequests where toid = %d and fromid=%d", userid, fromid);
 
     MySQL mysql;
-    if (mysql.connect())
-    {
-        mysql.update(sql);
-    }
+
+    mysql.update(sql);
 }
 
 /**
@@ -72,8 +66,6 @@ void RequestModel::removeRefuse(int requestid)
     sprintf(sql, "delete from friendrequests where id = %d", requestid);
 
     MySQL mysql;
-    if (mysql.connect())
-    {
-        mysql.update(sql);
-    }
+    
+    mysql.update(sql);
 }

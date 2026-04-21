@@ -1,4 +1,4 @@
-#include "db.h"
+#include "db.hpp"
 #include "logger.hpp"
 
 // 数据库配置信息
@@ -9,33 +9,17 @@ static string dbname = "chat";
 
 MySQL::MySQL()
 {
-    _conn = mysql_init(nullptr);
-    // 连接前设置选项
-    mysql_options(_conn, MYSQL_SET_CHARSET_NAME, "utf8mb4");
+    // _conn = mysql_init(nullptr);
+    // // 连接前设置选项
+    // mysql_options(_conn, MYSQL_SET_CHARSET_NAME, "utf8mb4");
+
+    _conn = MysqlPool::instance().getConnection();
 }
 // 释放数据库连接资源
 MySQL::~MySQL()
 {
     if (_conn != nullptr)
-        mysql_close(_conn);
-}
-// 连接数据库
-bool MySQL::connect()
-{
-    MYSQL *p = mysql_real_connect(_conn, server.c_str(), user.c_str(),
-                                  password.c_str(), dbname.c_str(), 3306, nullptr, 0);
-
-    mysql_set_character_set(_conn, "utf8mb4");
-    mysql_query(_conn, "SET NAMES utf8mb4");
-    if (p != nullptr)
-    {
-        LOG_INFO("connect mysql success!\n");
-    }
-    else
-    {
-        LOG_INFO("connect mysql fail!\n");
-    }
-    return p;
+        MysqlPool::instance().releaseConnection(_conn);
 }
 // 更新操作
 bool MySQL::update(string sql)
