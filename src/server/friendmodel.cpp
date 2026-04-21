@@ -1,4 +1,4 @@
-#include "friendModel.hpp"
+#include "friendmodel.hpp"
 #include "db.h"
 
 /**

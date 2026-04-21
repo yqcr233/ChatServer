@@ -1,7 +1,7 @@
 #include "message.hpp"
 #include "timeutil.hpp"
 #include "sessioninfo.hpp"
-#include "messageModel.hpp"
+#include "messagemodel.hpp"
 #include "timeutil.hpp"
 #include "db.h"
 

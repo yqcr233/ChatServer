@@ -6,10 +6,10 @@
 #include <unordered_map>
 #include <functional>
 #include "usermodel.hpp"
-#include "friendModel.hpp"
+#include "friendmodel.hpp"
 #include "offlinemessagemodel.hpp"
 #include "groupmodel.hpp"
-#include "messageModel.hpp"
+#include "messagemodel.hpp"
 #include "requestmodel.hpp"
 #include "rsa/rsa.hpp"
 #include "aesgcm/aesgcm.hpp"
