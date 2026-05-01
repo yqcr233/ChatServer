@@ -35,6 +35,11 @@ Chatservice::Chatservice()
     _msgHandlerMap.insert({REMOVE_REQUEST_REFUSE, std::bind(&Chatservice::rejectFriendRequest, this, _1, _2, _3)});
     _msgHandlerMap.insert({CREATE_GROUP_MSG, std::bind(&Chatservice::createGroupChat, this, _1, _2, _3)});
     _msgHandlerMap.insert({SETRSAAESKEY, std::bind(&Chatservice::setRsaAesKey, this, _1, _2, _3)});
+
+    /**
+     * 设置redis接收响应消息的回调
+     */
+    redis.initNotifyHandler(bind(&Chatservice::handleRedisSubscribeMessage, this, _1, _2));
 }
 
 MsgHandler Chatservice::getMsgHandler(int msgid)
@@ -87,7 +92,8 @@ void Chatservice::login(const TcpConnectionPtr &conn, json &js, TimeStamp time)
                 _userConnMap.insert({id, conn});
             }
 
-            // 登录成功，更新用户状态,并通知在线好友
+            // 登录成功，服务器订阅该用户通道，更新用户状态,并通知在线好友
+            redis.subcribe(id);
             user.setState("online");
             _userModel.updateState(user);
             vector<int> friendOnline = _friendModel.queryOnlineFriends(user.getId());
@@ -104,6 +110,11 @@ void Chatservice::login(const TcpConnectionPtr &conn, json &js, TimeStamp time)
                 {
                     LOG_INFO("%s\n", notice.dump().c_str());
                     sendMsg(it->second, notice.dump(), time);
+                }
+                else
+                {
+                    // 不在该服务器用户管理列表中时则向其他服务器发布消息
+                    redis.publish(f, notice.dump());
                 }
             }
 
@@ -241,7 +252,7 @@ void Chatservice::oneChat(const TcpConnectionPtr &conn, json &js, TimeStamp time
     _messageModel.insert(toid, fromid, -1, frommsg, 1, createat);
 
     LOG_INFO("toid:%d fromid:%d userState:%s\n", toid, fromid, user.getState().c_str());
-    // if (user.getState() == "online")
+    if (user.getState() == "online")
     {
         LOG_INFO("toid is online\n");
         lock_guard<mutex> lock(_connMutex);
@@ -251,7 +262,11 @@ void Chatservice::oneChat(const TcpConnectionPtr &conn, json &js, TimeStamp time
             LOG_INFO("transport msg\n");
             // 创建转发json，并进行转发
             sendMsg(it->second, js.dump(), time);
-            return;
+        }
+        else
+        {
+            // 向其他服务器发布消息
+            redis.publish(toid, js.dump());
         }
     }
 }
@@ -280,14 +295,22 @@ void Chatservice::groupChat(const TcpConnectionPtr &conn, json &js, TimeStamp ti
     lock_guard<mutex> lock(_connMutex);
     for (GroupUser &user : users)
     {
+        /**
+         * 先判断用户是否在线，再看是否转发到其他服务器
+         */
+        if (user.getState() == "offline")
+            continue;
+
         int id = user.getId();
         auto it = _userConnMap.find(id);
-        /**
-         * 判断群内其他用户是否在线
-         */
+
         if (it != _userConnMap.end())
         {
             sendMsg(it->second, js.dump(), time);
+        }
+        else
+        {
+            redis.publish(id, js.dump());
         }
     }
 }
@@ -551,17 +574,25 @@ void Chatservice::acceptFriendRequest(const TcpConnectionPtr &conn, json &js, Ti
     res["fstate"] = usr.getState();
     sendMsg(conn, res.dump(), time); // 通知当前用户
 
+    _requestModel.removeAccept(userid, fromid);
+
+    if (usr.getState() == "offline")
+        return;
     auto it = _userConnMap.find(usr.getId()); // 通知对方用户
+
+    json _js;
+    js["msgid"] = NOTICE_FRIENDSLISTCHANGED;
+    js["fid"] = _usr.getId();
+    js["fname"] = _usr.getName();
+    js["fstate"] = _usr.getState();
     if (it != _userConnMap.end())
     {
-        json js;
-        js["msgid"] = NOTICE_FRIENDSLISTCHANGED;
-        js["fid"] = _usr.getId();
-        js["fname"] = _usr.getName();
-        js["fstate"] = _usr.getState();
-        sendMsg(it->second, js.dump(), time);
+        sendMsg(it->second, _js.dump(), time);
     }
-    _requestModel.removeAccept(userid, fromid);
+    else
+    {
+        redis.publish(usr.getId(), _js.dump());
+    }
 }
 
 // 拒绝好友请求
@@ -609,12 +640,23 @@ void Chatservice::createGroupChat(const TcpConnectionPtr &conn, json &js, TimeSt
     sendMsg(conn, res.dump(), time);
     for (const auto &id : members)
     {
-        LOG_INFO("thid id: %d\n", id);
+        LOG_INFO("this id: %d\n", id);
         _groupModel.addGroup(id, group.getId(), "normal");
+        /**
+         * 先判断用户是否在线，再判断是否在当前服务器上
+         */
+        User usr = _userModel.query(id);
+        if (usr.getState() == "offline")
+            continue;
+
         auto it = _userConnMap.find(id);
         if (it != _userConnMap.end())
         {
             sendMsg(it->second, res.dump(), time);
+        }
+        else
+        {
+            redis.publish(id, res.dump());
         }
     }
 }
@@ -628,7 +670,7 @@ void Chatservice::sendMsg(const TcpConnectionPtr &conn, const string &msgStr, Ti
     AesGcmManager aesMan = getAesOfConn(conn);
     string _msgStr = aesMan.encrypt(msgStr);
     _msgStr = base64_encode(_msgStr);
-    
+
     uint32_t len = _msgStr.size();
     int chunk_len = 16 * 1024; //  每个消息分片16kb
     if (chunk_len >= len)
@@ -641,7 +683,7 @@ void Chatservice::sendMsg(const TcpConnectionPtr &conn, const string &msgStr, Ti
         string header(reinterpret_cast<char *>(&message_size), 4);
         fprintf(stdout, "Msg: %s\n", js.dump().c_str());
         fprintf(stdout, "Len: %d\n", js.dump().length());
-        
+
         lock_guard<mutex> lock(_sendMutex);
         conn->send(header + js.dump()); // 先传长度后传送消息主体
         fprintf(stdout, "message 发送成功\n");
@@ -729,7 +771,24 @@ bool Chatservice::findAesOfConn(const TcpConnectionPtr &conn)
     return true;
 }
 
-AesGcmManager Chatservice::getAesOfConn(const TcpConnectionPtr& conn) {
+AesGcmManager Chatservice::getAesOfConn(const TcpConnectionPtr &conn)
+{
     auto it = _connAesMap.find(conn);
     return it->second;
+}
+
+void Chatservice::handleRedisSubscribeMessage(int userid, string msg)
+{
+    /**
+     * 接收redis响应后进行跨服务器消息转发
+     */
+    lock_guard<mutex> lock(_connMutex);
+    auto it = _userConnMap.find(userid);
+    if (it != _userConnMap.end())
+    {
+        // it->second->send(msg);
+        TimeStamp time = TimeStamp::now();
+        sendMsg(it->second, msg, time);
+        return;
+    }
 }

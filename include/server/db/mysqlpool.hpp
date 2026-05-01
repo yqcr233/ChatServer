@@ -27,6 +27,10 @@ public:
               const std::string& db = "chat",
               int port = 3306,
               int poolSize = 5) {
+        this->_host = host;
+        this->_usr = user;
+        this->_password = password;
+        this->_db = db;
         
         std::lock_guard<std::mutex> lock(_mutex);
         

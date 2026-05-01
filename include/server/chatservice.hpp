@@ -11,6 +11,7 @@
 #include "requestmodel.hpp"
 #include "rsa/rsa.hpp"
 #include "aesgcm/aesgcm.hpp"
+#include "redis/redis.hpp"
 #include <mutex>
 #include <atomic>
 
@@ -60,6 +61,8 @@ public:
     bool findAesOfConn(const TcpConnectionPtr& conn);
     // 获取连接对应aes密钥
     AesGcmManager getAesOfConn(const TcpConnectionPtr& conn);
+    // 从redis消息队列中获取订阅的消息
+    void handleRedisSubscribeMessage(int, string);
     
     MsgHandler getMsgHandler(int msgid);
     void reset();
@@ -90,6 +93,8 @@ private:
     MessageModel _messageModel;
     RequestModel _requestModel;
     RsaKeyManager _decryptManager;
+
+    Redis redis;
 };
 
 #endif

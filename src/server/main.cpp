@@ -1,6 +1,7 @@
 #include "chatserver.hpp"
 #include "chatservice.hpp"
 #include "mysqlpool.hpp"
+#include "redispool.hpp"
 #include <iostream>
 #include <signal.h>
 #include "rsa.hpp"
@@ -11,7 +12,7 @@ void resetHandler(int) {
     exit(0);
 }
 
-int main(int argc, char const *argv[])
+int main(int argc, char **argv)
 {
     /**
      *  服务器ctrl+c中断信号时触发客户端状态重置函数
@@ -23,10 +24,18 @@ int main(int argc, char const *argv[])
         std::cerr << "数据库连接池初始化失败！" << std::endl;
         return 1;
     }
+
+    if (!RedisPool::getInstance().init("127.0.0.1", "6379", "12345", 20))
+    {
+        std::cerr << "Redis连接池初始化失败！" << std::endl;
+        return 1;
+    }
     
     EventLoop loop; 
+    char* ip = argv[1];
+    uint16_t port = atoi(argv[2]);
     // InetAddress addr("192.168.152.100", 9999);
-    InetAddress addr(9999, "192.168.152.100");
+    InetAddress addr(port, ip);
     ChatServer server(&loop, addr, "EchoServer");
     
     RsaKeyManager rsaManager;

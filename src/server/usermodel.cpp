@@ -22,7 +22,7 @@ bool UserModel::insert(User &user)
     return false;
 }
 
-// 根据用户号码查询用户信息
+// 根据用户名查询用户信息
 User UserModel::query(string name)
 {
     char sql[1024];
