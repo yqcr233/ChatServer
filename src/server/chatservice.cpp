@@ -2,6 +2,7 @@
 #include "public.hpp"
 #include <logger.hpp>
 #include "base64/base64.hpp"
+#include "filetransferhandler.hpp"
 
 using namespace std::placeholders;
 
@@ -35,6 +36,12 @@ Chatservice::Chatservice()
     _msgHandlerMap.insert({REMOVE_REQUEST_REFUSE, std::bind(&Chatservice::rejectFriendRequest, this, _1, _2, _3)});
     _msgHandlerMap.insert({CREATE_GROUP_MSG, std::bind(&Chatservice::createGroupChat, this, _1, _2, _3)});
     _msgHandlerMap.insert({SETRSAAESKEY, std::bind(&Chatservice::setRsaAesKey, this, _1, _2, _3)});
+
+    // 文件传输相关处理器
+    _msgHandlerMap.insert({FILE_TRANSFER_INIT, std::bind(&FileTransferHandler::handleFileTransferInit, FileTransferHandler::getInstance(), _1, _2, _3)});
+    _msgHandlerMap.insert({FILE_TRANSFER_DATA, std::bind(&FileTransferHandler::handleFileTransferData, FileTransferHandler::getInstance(), _1, _2, _3)});
+    _msgHandlerMap.insert({FILE_TRANSFER_REQUEST, std::bind(&FileTransferHandler::handleFileTransferRequest, FileTransferHandler::getInstance(), _1, _2, _3)});
+    _msgHandlerMap.insert({FILE_TRANSFER_CANCEL, std::bind(&FileTransferHandler::handleFileTransferCancel, FileTransferHandler::getInstance(), _1, _2, _3)});
 
     /**
      * 设置redis接收响应消息的回调
@@ -198,6 +205,7 @@ void Chatservice::loginOut(const TcpConnectionPtr &conn, json &js, TimeStamp tim
         {
             _userConnMap.erase(it);
         }
+        _lastHeartMap.erase(userid);
     }
 
     User user(userid, "", "", "offline");
@@ -333,8 +341,14 @@ void Chatservice::clientCloseException(const TcpConnectionPtr &conn)
 
     if (usr.getId() != -1)
     {
+        {
+            lock_guard<mutex> lock(_connMutex);
+            _lastHeartMap.erase(usr.getId());
+        }
         usr.setState("offline");
         _userModel.updateState(usr);
+        // 清理该用户未完成的文件传输
+        FileTransferHandler::getInstance()->cleanupUserTransfers(usr.getId());
     }
 }
 
@@ -372,10 +386,57 @@ void Chatservice::heartCheck(const TcpConnectionPtr &conn, json &js, TimeStamp t
 {
     string heartmsg = js["heartMsg"];
     LOG_INFO("%s\n", heartmsg.c_str());
+
+    // 记录心跳时间，并在心跳处理时顺带清扫僵尸连接
+    {
+        lock_guard<mutex> lock(_connMutex);
+        for (auto &kv : _userConnMap)
+        {
+            if (kv.second == conn)
+            {
+                _lastHeartMap[kv.first] = time.microSecondsSinceEpoch();
+                break;
+            }
+        }
+    }
+    // checkHeartbeatTimeout();
+
     json res;
     res["msgid"] = HEART_MSG;
     res["heartMsg"] = "heart_ok";
     sendMsg(conn, res.dump(), time);
+}
+
+void Chatservice::checkHeartbeatTimeout()
+{
+    int64_t now = TimeStamp::now().microSecondsSinceEpoch();
+
+    lock_guard<mutex> lock(_connMutex);
+    auto it = _userConnMap.begin();
+    while (it != _userConnMap.end())
+    {
+        int uid = it->first;
+        auto ht = _lastHeartMap.find(uid);
+        if (ht == _lastHeartMap.end() || (now - ht->second) > kHeartTimeout)
+        {
+            it->second->shutdown();
+            _connAesMap.erase(it->second);
+            _lastHeartMap.erase(uid);
+            it = _userConnMap.erase(it);
+
+            User u(uid, "", "", "offline");
+            _userModel.updateState(u);
+
+            // 清理该用户未完成的文件传输
+            FileTransferHandler::getInstance()->cleanupUserTransfers(uid);
+
+            LOG_INFO("心跳超时，踢出僵尸连接: userid=%d\n", uid);
+        }
+        else
+        {
+            ++it;
+        }
+    }
 }
 
 void Chatservice::getSessionHistory(const TcpConnectionPtr &conn, json &js, TimeStamp time)
@@ -578,20 +639,24 @@ void Chatservice::acceptFriendRequest(const TcpConnectionPtr &conn, json &js, Ti
 
     if (usr.getState() == "offline")
         return;
-    auto it = _userConnMap.find(usr.getId()); // 通知对方用户
 
     json _js;
-    js["msgid"] = NOTICE_FRIENDSLISTCHANGED;
-    js["fid"] = _usr.getId();
-    js["fname"] = _usr.getName();
-    js["fstate"] = _usr.getState();
-    if (it != _userConnMap.end())
+    _js["msgid"] = NOTICE_FRIENDSLISTCHANGED;
+    _js["fid"] = _usr.getId();
+    _js["fname"] = _usr.getName();
+    _js["fstate"] = _usr.getState();
+
     {
-        sendMsg(it->second, _js.dump(), time);
-    }
-    else
-    {
-        redis.publish(usr.getId(), _js.dump());
+        lock_guard<mutex> lock(_connMutex);
+        auto it = _userConnMap.find(usr.getId()); // 通知对方用户
+        if (it != _userConnMap.end())
+        {
+            sendMsg(it->second, _js.dump(), time);
+        }
+        else
+        {
+            redis.publish(usr.getId(), _js.dump());
+        }
     }
 }
 
@@ -615,8 +680,17 @@ void Chatservice::createGroupChat(const TcpConnectionPtr &conn, json &js, TimeSt
     string groupname = js["groupname"];
     string groupdesc = js["groupdesc"];
     string memberids = js["memberids"];
-    json members_js = json::parse(memberids);
-    vector<int> members = members_js.get<vector<int>>();
+    vector<int> members;
+    try
+    {
+        json members_js = json::parse(memberids);
+        members = members_js.get<vector<int>>();
+    }
+    catch (const json::exception &e)
+    {
+        LOG_ERROR("createGroupChat: failed to parse memberids: %s\n", e.what());
+        return;
+    }
     LOG_INFO("this memberids: ");
     for (auto member : members)
     {
@@ -649,14 +723,17 @@ void Chatservice::createGroupChat(const TcpConnectionPtr &conn, json &js, TimeSt
         if (usr.getState() == "offline")
             continue;
 
-        auto it = _userConnMap.find(id);
-        if (it != _userConnMap.end())
         {
-            sendMsg(it->second, res.dump(), time);
-        }
-        else
-        {
-            redis.publish(id, res.dump());
+            lock_guard<mutex> lock(_connMutex);
+            auto it = _userConnMap.find(id);
+            if (it != _userConnMap.end())
+            {
+                sendMsg(it->second, res.dump(), time);
+            }
+            else
+            {
+                redis.publish(id, res.dump());
+            }
         }
     }
 }
@@ -666,10 +743,18 @@ void Chatservice::sendMsg(const TcpConnectionPtr &conn, const string &msgStr, Ti
     /**
      * 分片协议：message_size + js{chunk_id, chunk_count, message}
      */
-    // 发送消息之前先加密
-    AesGcmManager aesMan = getAesOfConn(conn);
-    string _msgStr = aesMan.encrypt(msgStr);
-    _msgStr = base64_encode(_msgStr);
+    // 发送消息之前先加密（AES密钥未协商时明文发送）
+    string _msgStr;
+    if (findAesOfConn(conn))
+    {
+        AesGcmManager aesMan = getAesOfConn(conn);
+        _msgStr = aesMan.encrypt(msgStr);
+        _msgStr = base64_encode(_msgStr);
+    }
+    else
+    {
+        _msgStr = msgStr;
+    }
 
     uint32_t len = _msgStr.size();
     int chunk_len = 16 * 1024; //  每个消息分片16kb
@@ -774,7 +859,9 @@ bool Chatservice::findAesOfConn(const TcpConnectionPtr &conn)
 AesGcmManager Chatservice::getAesOfConn(const TcpConnectionPtr &conn)
 {
     auto it = _connAesMap.find(conn);
-    return it->second;
+    if (it != _connAesMap.end())
+        return it->second;
+    return AesGcmManager();
 }
 
 void Chatservice::handleRedisSubscribeMessage(int userid, string msg)

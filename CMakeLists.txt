@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.0)
 project(Chat)
 
 # 配置编译选项
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_CFLAGS ${CMAKE_CXX_CFLAGS} -g)
 
 # 配置可执行文件输出路径
@@ -15,6 +17,7 @@ include_directories(${PROJECT_SOURCE_DIR}/include/server/rsa)
 include_directories(${PROJECT_SOURCE_DIR}/include/server/base64)
 include_directories(${PROJECT_SOURCE_DIR}/include/server/aesgcm)
 include_directories(${PROJECT_SOURCE_DIR}/include/server/web)
+include_directories(${PROJECT_SOURCE_DIR}/include/server/redis)
 include_directories(${PROJECT_SOURCE_DIR}/thirdpart)
 # set(MUDUO_INCLUDE_DIR "/home/fjf/chatpro_res/build/release-install-cpp11/include")
 # include_directories(${MUDUO_INCLUDE_DIR})

@@ -63,6 +63,11 @@ public:
     AesGcmManager getAesOfConn(const TcpConnectionPtr& conn);
     // 从redis消息队列中获取订阅的消息
     void handleRedisSubscribeMessage(int, string);
+    // 发送消息（供 FileTransferHandler 等外部调用）
+    void sendMsg(const TcpConnectionPtr& conn, const string &msgStr, TimeStamp time);
+
+    // 扫描并踢出心跳超时的僵尸连接
+    void checkHeartbeatTimeout();
     
     MsgHandler getMsgHandler(int msgid);
     void reset();
@@ -71,8 +76,6 @@ private:
      * 单例模式，构造函数私有化，不允许外部构造
      */
     Chatservice();
-
-    void sendMsg(const TcpConnectionPtr& conn, const string &msgStr, TimeStamp time);
 
     // 存储消息id与对应处理器映射表，由于是在程序一开始就初始化完毕，不用考虑线程安全问题
     unordered_map<int, MsgHandler> _msgHandlerMap;
@@ -86,6 +89,11 @@ private:
     mutex _sendMutex;
     // 记录发送消息全局seq，维护消息有序性
     atomic<int> seq;
+
+    // 记录每个在线用户最后一次心跳时间（微秒）
+    unordered_map<int, int64_t> _lastHeartMap;
+    // 心跳超时阈值：90秒 = 3个心跳周期（客户端每30s发一次）
+    static const int64_t kHeartTimeout = 90 * 1000 * 1000; // 微秒
 
     UserModel _userModel;
     FriendModel _friendModel;

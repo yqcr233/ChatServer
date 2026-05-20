@@ -1,0 +1,16 @@
+{
+  "mysql": {
+    "host": "127.0.0.1",
+    "port": 3306,
+    "user": "root",
+    "password": "12345",
+    "database": "chat",
+    "pool_size": 5
+  },
+  "redis": {
+    "host": "127.0.0.1",
+    "port": 6379,
+    "password": "12345",
+    "pool_size": 20
+  }
+}

@@ -7,6 +7,9 @@
 #include "callbacks.hpp"
 #include <iostream>
 #include <string>
+#include <thread>
+#include <atomic>
+#include <chrono>
 
 using namespace std;
 
@@ -17,6 +20,7 @@ public:
     ChatServer(EventLoop *loop,
                const InetAddress &listenAddr,
                const string &nameArg);
+    ~ChatServer();
     // 启动ChatServer服务
     void start();
 
@@ -32,6 +36,10 @@ private:
     TcpServer _server;
     EventLoop *_loop;
     string privateRsa;
+
+    // 后台心跳超时检测线程
+    atomic_bool _heartbeatRunning;
+    thread _heartbeatThread;
 };
 
 #endif

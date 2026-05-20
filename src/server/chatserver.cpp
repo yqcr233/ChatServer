@@ -26,6 +26,26 @@ ChatServer::ChatServer(EventLoop *loop,
      * 设置线程数大于1时，会默认分出一个线程作为新用户连接线程，其他为工作线程
      */
     _server.setThreadNum(4);
+
+    // 启动后台心跳超时检测线程，每5秒扫描一次僵尸连接
+    _heartbeatRunning = true;
+    _heartbeatThread = thread([this]{
+        while (_heartbeatRunning)
+        {
+            this_thread::sleep_for(chrono::seconds(5));
+            Chatservice::getInstance()->checkHeartbeatTimeout();
+        }
+    });
+    
+}
+
+ChatServer::~ChatServer()
+{
+    _heartbeatRunning = false;
+    if (_heartbeatThread.joinable())
+    {
+        _heartbeatThread.join();
+    }
 }
 
 void ChatServer::start()
@@ -55,14 +75,34 @@ void ChatServer::onMessage(const TcpConnectionPtr &con,
         _buf = aesMan.decrypt(_buf);
     }
     fprintf(stdout, "%s\n", _buf.c_str());
-    json js = json::parse(_buf);
-    /**
-     * 完全解耦网络模块代码和业务模块的代码
-     * 在网络层server中没有调用任何业务层方法，而是通过映射表获取Handler
-     */
-    auto msgHandler = service->getMsgHandler(js["msgid"].get<int>());
-    /**
-     * 处理器执行相应业务处理
-     */
-    msgHandler(con, js, time);
+    try
+    {
+        json js = json::parse(_buf);
+        if (!js.contains("msgid") || !js["msgid"].is_number_integer())
+        {
+            LOG_ERROR("Invalid message: missing or invalid msgid field\n");
+            return;
+        }
+        /**
+         * 完全解耦网络模块代码和业务模块的代码
+         * 在网络层server中没有调用任何业务层方法，而是通过映射表获取Handler
+         */
+        auto msgHandler = service->getMsgHandler(js["msgid"].get<int>());
+        /**
+         * 处理器执行相应业务处理
+         */
+        msgHandler(con, js, time);
+    }
+    catch (const json::parse_error &e)
+    {
+        LOG_ERROR("JSON parse error: %s\n", e.what());
+    }
+    catch (const json::exception &e)
+    {
+        LOG_ERROR("JSON exception: %s\n", e.what());
+    }
+    catch (const std::exception &e)
+    {
+        LOG_ERROR("Message handler exception: %s\n", e.what());
+    }
 }

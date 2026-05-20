@@ -7,6 +7,7 @@ class TimeStamp{
         explicit TimeStamp(int64_t microSecondsSinceEpoch);
         static TimeStamp now(); // 获取当前时间戳并封装为TimeStamp
         string ToString() const; // 将时间戳转换成字符串
+        int64_t microSecondsSinceEpoch() const { return microSecondsSinceEpoch_; }
     private:
         int64_t microSecondsSinceEpoch_; // 存储自1900-01-01 00:00:00以来的微秒数
 };
